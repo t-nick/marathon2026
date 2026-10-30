@@ -1,0 +1,180 @@
+{
+  "Reservations": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "demo-reservation" },
+          "GroupReservationId": { "S": "demo-group" },
+          "GuestSessionId": { "S": "gs-owner" }
+        }
+      }
+    }
+  ],
+  "GroupReservations": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "demo-group" },
+          "ReservationId": { "S": "demo-reservation" },
+          "LocationId": { "S": "demo-location" },
+          "Status": { "S": "Open" },
+          "MaxGuestCount": { "N": "5" },
+          "TableNumber": { "N": "7" },
+          "StartTime": { "S": "2026-10-21T16:00:00Z" },
+          "EndTime": { "S": "2026-10-21T17:30:00Z" }
+        }
+      }
+    }
+  ],
+  "GuestInvites": [
+    {
+      "PutRequest": {
+        "Item": {
+          "token": { "S": "demo-invite-token" },
+          "GroupReservationId": { "S": "demo-group" },
+          "LocationId": { "S": "demo-location" },
+          "RestaurantName": { "S": "Green & Tasty" },
+          "LocationAddress": { "S": "Rustaveli Avenue 48" },
+          "StartTime": { "S": "2026-10-21T16:00:00Z" },
+          "EndTime": { "S": "2026-10-21T17:30:00Z" },
+          "MaxGuestCount": { "N": "5" },
+          "TableNumber": { "N": "7" },
+          "InviterName": { "S": "Yevhenii" }
+        }
+      }
+    }
+  ],
+  "GuestSessions": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "gs-owner" },
+          "GroupReservationId": { "S": "demo-group" },
+          "type": { "S": "Owner" },
+          "name": { "S": "Yevhenii" },
+          "isSubmitted": { "BOOL": true },
+          "total": { "N": "26.5" },
+          "items": {
+            "L": [
+              {
+                "M": {
+                  "dish": {
+                    "M": {
+                      "id": { "S": "dish-spring-salad" },
+                      "name": { "S": "Spring Salad" },
+                      "price": { "N": "12" },
+                      "weight": { "S": "430 g" },
+                      "imageUrl": { "S": "assets/img/dishes/spring-salad.jpg" }
+                    }
+                  },
+                  "quantity": { "N": "1" }
+                }
+              },
+              {
+                "M": {
+                  "dish": {
+                    "M": {
+                      "id": { "S": "dish-avocado-bowl" },
+                      "name": { "S": "Avocado Pine Nut Bowl" },
+                      "price": { "N": "14.5" },
+                      "weight": { "S": "380 g" },
+                      "imageUrl": { "S": "assets/img/dishes/avocado-pine-nut-bowl.jpg" }
+                    }
+                  },
+                  "quantity": { "N": "1" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "gs-kateryna" },
+          "GroupReservationId": { "S": "demo-group" },
+          "type": { "S": "Guest" },
+          "name": { "S": "Kateryna" },
+          "isSubmitted": { "BOOL": true },
+          "total": { "N": "24" },
+          "items": {
+            "L": [
+              {
+                "M": {
+                  "dish": {
+                    "M": {
+                      "id": { "S": "dish-spring-salad" },
+                      "name": { "S": "Spring Salad" },
+                      "price": { "N": "12" },
+                      "weight": { "S": "430 g" },
+                      "imageUrl": { "S": "assets/img/dishes/spring-salad.jpg" }
+                    }
+                  },
+                  "quantity": { "N": "2" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "gs-mariia" },
+          "GroupReservationId": { "S": "demo-group" },
+          "type": { "S": "Guest" },
+          "name": { "S": "Mariia" },
+          "isSubmitted": { "BOOL": false },
+          "total": { "N": "24" },
+          "items": {
+            "L": [
+              {
+                "M": {
+                  "dish": {
+                    "M": {
+                      "id": { "S": "dish-strawberry-salad" },
+                      "name": { "S": "Fresh Strawberry Mint Salad" },
+                      "price": { "N": "11" },
+                      "weight": { "S": "350 g" },
+                      "imageUrl": { "S": "assets/img/dishes/fresh-strawberry-mint-salad.jpg" }
+                    }
+                  },
+                  "quantity": { "N": "1" }
+                }
+              },
+              {
+                "M": {
+                  "dish": {
+                    "M": {
+                      "id": { "S": "dish-potato-lentil" },
+                      "name": { "S": "Roasted Sweet Potato & Lentil Salad" },
+                      "price": { "N": "13" },
+                      "weight": { "S": "400 g" },
+                      "imageUrl": { "S": "assets/img/dishes/roasted-sweet-potato-and-lentil-salad.jpg" }
+                    }
+                  },
+                  "quantity": { "N": "1" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": { "S": "gs-mariana" },
+          "GroupReservationId": { "S": "demo-group" },
+          "type": { "S": "Guest" },
+          "name": { "S": "Mariana" },
+          "isSubmitted": { "BOOL": false },
+          "total": { "N": "0" },
+          "items": { "L": [] }
+        }
+      }
+    }
+  ]
+}

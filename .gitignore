@@ -27,3 +27,5 @@ crash.*.log
 homework-backend.md
 .github/agents
 .github/skills
+.nvmrc
+frontend/restaurant-frontend-app/dist
