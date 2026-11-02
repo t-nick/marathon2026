@@ -1,23 +1,59 @@
 <article class="card">
-  <h2 class="title">{{ title() }}</h2>
-
-  @if (participant().isSubmitted) {
-    <span class="chip submitted">Submitted</span>
-    } @else {
-    <span class="chip pending">Still choosing</span>
+  <header class="card-header">
+    <h2 class="title">{{ title() }}</h2>
+    @if (isOwner()) {
+      <button class="edit-button" type="button" (click)="editClick.emit()">
+        Edit my Pre-Order
+      </button>
+    } @else if (canRemove()) {
+      <button
+        class="edit-button"
+        type="button"
+        [attr.aria-label]="'Remove ' + participant().name"
+        (click)="removeClick.emit()"
+      >
+        Remove Guest
+      </button>
     }
+  </header>
 
   @if (participant().items.length) {
     <ul class="items">
       @for (item of participant().items; track item.dish.id) {
         <li class="item">
+          <button
+            class="remove-dish-button"
+            type="button"
+            [attr.aria-label]="'Remove ' + item.dish.name"
+            (click)="removeDishClick.emit(item)"
+          >
+            <img src="assets/svg/trash.svg" alt="" aria-hidden="true" />
+          </button>
           @if (item.dish.imageUrl) {
             <img class="avatar" [src]="item.dish.imageUrl" alt="" width="40" height="40" loading="lazy" />
           } @else {
             <span class="avatar initial" aria-hidden="true">{{ item.dish.name.charAt(0) }}</span>
           }
           <p class="name">{{ item.dish.name }}</p>
-          <p class="qty">× {{ item.quantity }}</p>
+          <div class="qty">
+            <button
+              class="quantity-button"
+              type="button"
+              [attr.aria-label]="'Decrease ' + item.dish.name + ' quantity'"
+              (click)="decreaseQuantity.emit(item)"
+            >
+              -
+            </button>
+            <span class="quantity-number">{{ item.quantity }}</span>
+            <button
+              class="quantity-button"
+              type="button"
+              [attr.aria-label]="'Increase ' + item.dish.name + ' quantity'"
+              (click)="increaseQuantity.emit(item)"
+            >
+              +
+            </button>
+          </div>
           <p class="price">{{ item.dish.price * item.quantity | currency }}</p>
         </li>
       }
@@ -26,5 +62,8 @@
     <p class="empty">No dishes yet</p>
   }
 
-  <p class="subtotal"><span>Subtotal</span><span>{{ participant().total | currency }}</span></p>
+  <footer class="subtotal">
+    <span class="subtotal-label">Subtotal</span>
+    <strong class="subtotal-value">{{ participant().total | currency }}</strong>
+  </footer>
 </article>
