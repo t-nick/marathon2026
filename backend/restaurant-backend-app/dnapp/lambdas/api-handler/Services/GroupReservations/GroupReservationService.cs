@@ -1,15 +1,19 @@
 using APIHandler.Constants;
+using APIHandler.Constants.Orders;
 using APIHandler.Entities;
 using APIHandler.Exceptions;
 using APIHandler.Models.GroupReservation;
 using APIHandler.Models.GuestReservation;
 using APIHandler.Repositories.GroupReservations;
 using APIHandler.Repositories.GuestSessions;
+using APIHandler.Repositories.Orders;
 using APIHandler.Repositories.Reservations;
 using APIHandler.Repositories.Tables;
 using APIHandler.Services.Auth;
 using APIHandler.Services.Locations;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace APIHandler.Services.GroupReservations;
@@ -20,7 +24,8 @@ public class GroupReservationService(
     IReservationRepository reservationRepository,
     IGuestSessionRepository guestSessionRepository,
     IUserService userService,
-    ILocationService locationService) : IGroupReservationService
+    ILocationService locationService,
+    IOrderRepository? orderRepository = null) : IGroupReservationService
 {
     private const string DefaultRestaurantName = "Green & Tasty";
 
@@ -142,5 +147,96 @@ public class GroupReservationService(
 
         return new GetGroupInviteTokenResponse(groupReservation.ReservationToken);
     }
-}
 
+    public async Task<List<SubmittedDishQuantityResponse>> SubmitGroupReservationAsync(
+        string userId,
+        string groupReservationId,
+        string reservationId)
+    {
+        GroupReservation groupReservation = await groupReservationRepository.GetGroupReservationByIdAsync(groupReservationId)
+            ?? throw new GroupReservationNotFoundException();
+
+        Reservation reservation = await reservationRepository.GetReservationByIdAsync(reservationId)
+            ?? throw new ReservationNotFoundException($"Reservation '{reservationId}' was not found.");
+
+        if (!string.Equals(groupReservation.ReservationId, reservationId, StringComparison.Ordinal))
+            throw new GroupReservationNotFoundException();
+
+        if (!string.Equals(reservation.CustomerId, userId, StringComparison.OrdinalIgnoreCase))
+            throw new ActionForbiddenException("Only the reservation owner can submit this group reservation.");
+
+        List<GuestSession> submittedSessions = (await guestSessionRepository
+                .GetAllByGroupReservationIdAsync(groupReservationId))
+            .Where(session => session.IsSubmitted)
+            .ToList();
+
+        if (submittedSessions.Count == 0)
+            throw new ValidationException("There are no submitted guest sessions.");
+
+        List<SubmittedDishQuantityResponse> consolidatedDishes = submittedSessions
+            .SelectMany(session => session.Dishes ?? [])
+            .GroupBy(dish => dish.DishId)
+            .Select(group => new SubmittedDishQuantityResponse(group.Key, group.Sum(dish => dish.Quantity)))
+            .ToList();
+
+        if (consolidatedDishes.Count == 0)
+            throw new ValidationException("Submitted guest sessions contain no dishes.");
+
+        IOrderRepository orderDataAccess = orderRepository
+            ?? throw new InvalidOperationException("Order repository is not configured.");
+        Order order = await orderDataAccess.GetOrderByReservationIdAsync(reservationId)
+            ?? throw new ValidationException("Order was not found for the reservation.");
+
+        if (groupReservation.Status == GroupReservationStatus.Submitted)
+            return consolidatedDishes;
+
+        OrderStatus expectedOrderStatus = order.Status;
+        GroupReservationStatus expectedGroupReservationStatus = groupReservation.Status;
+        long? expectedSubmissionRevision = groupReservation.SubmissionRevision;
+
+        order.Dishes ??= [];
+        foreach (SubmittedDishQuantityResponse consolidatedDish in consolidatedDishes)
+        {
+            OrderItem? existingItem = order.Dishes.FirstOrDefault(item => item.DishId == consolidatedDish.DishId);
+            if (existingItem is null)
+            {
+                order.Dishes.Add(new OrderItem
+                {
+                    DishId = consolidatedDish.DishId,
+                    Quantity = consolidatedDish.Quantity,
+                    State = OrderItemState.Pending
+                });
+            }
+            else
+            {
+                existingItem.Quantity += consolidatedDish.Quantity;
+            }
+        }
+
+        order.Status = OrderStatus.SubmittedByCustomer;
+        groupReservation.Status = GroupReservationStatus.Submitted;
+
+        try
+        {
+            await orderDataAccess.SubmitGroupReservationAtomicallyAsync(
+                order,
+                groupReservation,
+                expectedOrderStatus,
+                expectedGroupReservationStatus,
+                expectedSubmissionRevision);
+        }
+        catch (Amazon.DynamoDBv2.Model.TransactionCanceledException)
+        {
+            // A concurrent retry may have committed both updates before this transaction
+            // was evaluated. The group status is the durable idempotency marker.
+            GroupReservation? latestGroupReservation = await groupReservationRepository
+                .GetGroupReservationByIdAsync(groupReservationId);
+            if (latestGroupReservation?.Status == GroupReservationStatus.Submitted)
+                return consolidatedDishes;
+
+            throw;
+        }
+
+        return consolidatedDishes;
+    }
+}

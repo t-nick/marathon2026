@@ -555,6 +555,10 @@ Response: `200 OK`
 ```
 
 ### `GET` /reservations/{reservationId}/guest-session-id
+Owner-only. Requires an authenticated Cognito `sub`; unauthenticated requests receive
+`401 Unauthorized`, and non-owners receive `403 Forbidden`. Missing reservation, group
+reservation, or owner guest session returns `404 Not Found`.
+
 Response: `200 OK`
 ```json
 {
@@ -1180,15 +1184,38 @@ Response: 200 OK
 ```
 
 ### `POST` /group-reservations/{groupReservationId}/submit
-Response: 200 OK
+Owner-only. Requires an authenticated Cognito `sub` and a request body containing the
+reservation associated with the group reservation:
 ```json
 {
-  "message": "Group reservation pre-order submitted successfully."
+  "reservationId": "string"
 }
 ```
 
+Only submitted guest sessions are included. Their dish quantities are consolidated by `dishId`,
+added to the existing order, and returned as the resulting aggregate for those submitted sessions.
+The order status is set to `SubmittedByCustomer` and the group reservation status is set to
+`Submitted`.
+
+Response: 200 OK
+```json
+[
+  {
+    "dishId": "string",
+    "quantity": 3
+  }
+]
+```
+Missing reservation or group reservation returns `404 Not Found`; non-owners receive
+`403 Forbidden`; unauthenticated requests receive `401 Unauthorized`. Invalid input, no submitted
+guest sessions, submitted sessions with no dishes, or a missing order returns `400 Bad Request`.
+
 ### `GET` /guest/groups/{groupReservationId}/sessions
-Owner-only. Returns the participants and aggregate pre-order total for the group reservation.
+Owner-only. Returns every joined participant, including the owner when an owner session exists.
+Each participant includes their resolvable dishes and quantities; the participant `total` is the
+sum of dish price multiplied by quantity, and the response `total` is the sum of participant totals.
+With no joined sessions, `participants` is empty and `total` is `0`. Saved dishes that no longer
+resolve to a dish record are omitted from the participant's items and totals.
 
 Response: 200 OK
 ```json
@@ -1217,13 +1244,39 @@ Response: 200 OK
 ```
 
 The owner participant's name is the reservation owner's Cognito `given_name`.
-Unauthenticated requests receive `401 Unauthorized`; non-owners receive `403 Forbidden`;
+Requests without an authenticated Cognito `sub` receive `401 Unauthorized`; non-owners receive `403 Forbidden`;
 missing group reservations or parent reservations receive `404 Not Found`.
 
 ### `DELETE` /guest/groups/{groupReservationId}/sessions/{guestSessionId}
+Owner-only. Deletes one participant session from the group pre-order and returns the updated participant snapshot in the same shape as `GET` sessions.
+
 Response: 200 OK
 ```json
 {
-  "message": "Guest session removed from group successfully."
+  "participants": [
+    {
+      "id": "session2",
+      "type": "Guest",
+      "name": "Olena",
+      "items": [
+        {
+          "dish": {
+            "id": "dish2",
+            "name": "Tom Yum",
+            "price": 220
+          },
+          "quantity": 1
+        }
+      ],
+      "total": 220,
+      "isSubmitted": false
+    }
+  ],
+  "total": 220
 }
 ```
+
+Missing path parameters, or a guest session that belongs to another group reservation, receive `400 Bad Request`.
+A missing Cognito `sub` receives `401 Unauthorized`.
+A non-owner receives `403 Forbidden`.
+A missing guest session, group reservation, or parent reservation receives `404 Not Found`.

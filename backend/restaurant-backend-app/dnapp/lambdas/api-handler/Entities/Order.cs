@@ -38,4 +38,8 @@ public class Order
     [DynamoDBProperty("status", typeof(EnumAsIntConverter<OrderStatus>))]
     [JsonPropertyName("status")]
     public OrderStatus Status { get; set; }
+
+    [DynamoDBVersion]
+    [DynamoDBProperty("version")]
+    public int? Version { get; set; }
 }
