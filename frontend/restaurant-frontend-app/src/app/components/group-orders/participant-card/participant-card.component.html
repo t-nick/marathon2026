@@ -1,11 +1,11 @@
 <article class="card">
   <header class="card-header">
     <h2 class="title">{{ title() }}</h2>
-    @if (isOwner()) {
+    @if (isOwner() && !isReadOnly()) {
       <button class="edit-button" type="button" (click)="editClick.emit()">
         Edit my Pre-Order
       </button>
-    } @else if (canRemove()) {
+    } @else if (!isOwner() && canRemove() && !isReadOnly()) {
       <button
         class="edit-button"
         type="button"
@@ -21,14 +21,18 @@
     <ul class="items">
       @for (item of participant().items; track item.dish.id) {
         <li class="item">
-          <button
-            class="remove-dish-button"
-            type="button"
-            [attr.aria-label]="'Remove ' + item.dish.name"
-            (click)="removeDishClick.emit(item)"
-          >
-            <img src="assets/svg/trash.svg" alt="" aria-hidden="true" />
-          </button>
+          @if (!isReadOnly()) {
+            <button
+              class="remove-dish-button"
+              type="button"
+              [attr.aria-label]="'Remove ' + item.dish.name"
+              (click)="removeDishClick.emit(item)"
+            >
+              <img src="assets/svg/trash.svg" alt="" aria-hidden="true" />
+            </button>
+          } @else {
+            <span class="remove-dish-placeholder" aria-hidden="true"></span>
+          }
           @if (item.dish.imageUrl) {
             <img class="avatar" [src]="item.dish.imageUrl" alt="" width="40" height="40" loading="lazy" />
           } @else {
@@ -36,23 +40,27 @@
           }
           <p class="name">{{ item.dish.name }}</p>
           <div class="qty">
-            <button
-              class="quantity-button"
-              type="button"
-              [attr.aria-label]="'Decrease ' + item.dish.name + ' quantity'"
-              (click)="decreaseQuantity.emit(item)"
-            >
-              -
-            </button>
+            @if (!isReadOnly()) {
+              <button
+                class="quantity-button"
+                type="button"
+                [attr.aria-label]="'Decrease ' + item.dish.name + ' quantity'"
+                (click)="decreaseQuantity.emit(item)"
+              >
+                -
+              </button>
+            }
             <span class="quantity-number">{{ item.quantity }}</span>
-            <button
-              class="quantity-button"
-              type="button"
-              [attr.aria-label]="'Increase ' + item.dish.name + ' quantity'"
-              (click)="increaseQuantity.emit(item)"
-            >
-              +
-            </button>
+            @if (!isReadOnly()) {
+              <button
+                class="quantity-button"
+                type="button"
+                [attr.aria-label]="'Increase ' + item.dish.name + ' quantity'"
+                (click)="increaseQuantity.emit(item)"
+              >
+                +
+              </button>
+            }
           </div>
           <p class="price">{{ item.dish.price * item.quantity | currency }}</p>
         </li>

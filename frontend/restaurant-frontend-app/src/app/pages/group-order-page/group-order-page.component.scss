@@ -3,7 +3,7 @@
 .page {
   box-sizing: border-box;
   width: min(100% - 32px, 832px);
-  min-height: calc(100vh - 48px);
+  min-height: calc(100vh - 112px);
   margin: 24px auto;
   padding: clamp(20px, 4vw, 40px);
   background: color.$neutral-100;
@@ -40,6 +40,16 @@
   line-height: 16px;
 }
 
+.submitted-status {
+  background: color.$green-100;
+  color: color.$green-800;
+}
+
+.closed-status {
+  background: color.$neutral-200;
+  color: color.$neutral-600;
+}
+
 .reservation-info {
   display: flex;
   flex-wrap: wrap;
@@ -67,6 +77,66 @@
   margin: 24px 0 0;
   padding: 0;
   list-style: none;
+}
+
+.scroll-container {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pending-notice {
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid color.$orange-100;
+  border-radius: 8px;
+  background: color.$orange-30;
+  color: color.$neutral-900;
+  line-height: 1.5;
+}
+
+.empty-state,
+.page-state {
+  padding: 24px 0;
+  color: color.$neutral-600;
+  text-align: center;
+}
+
+.error-state {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.consolidated-order {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 14px;
+  background: color.$neutral-0;
+
+  h2 {
+    margin-bottom: 12px;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+}
+
+.consolidated-items {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid color.$neutral-100;
+  }
 }
 
 .grand-total {
@@ -116,6 +186,37 @@
   }
 }
 
+.secondary-button {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid color.$neutral-200;
+  border-radius: 8px;
+  background: color.$neutral-0;
+  color: color.$neutral-900;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.6;
+  }
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.dialog-submit {
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 20px;
+}
+
 @media (max-width: 480px) {
   .page {
     width: 100%;
@@ -136,5 +237,9 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .consolidated-order {
+    padding: 16px;
   }
 }

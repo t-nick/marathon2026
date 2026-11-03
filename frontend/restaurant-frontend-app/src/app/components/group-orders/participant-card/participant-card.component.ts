@@ -13,6 +13,7 @@ export class ParticipantCardComponent {
   // що картка отримує ззовні — як параметр функції
   readonly participant = input.required<Participant>();
   readonly isOwner = input(false);
+  readonly isReadOnly = input(false);
   readonly editClick = output<void>();
   readonly canRemove = input(false);
   readonly removeClick = output<void>();

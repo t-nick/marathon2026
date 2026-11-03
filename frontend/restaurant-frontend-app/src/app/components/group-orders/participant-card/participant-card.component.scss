@@ -33,8 +33,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid color.$green-600;
-    outline-offset: 3px;
+    border-radius: 6px;
   }
 }
 
@@ -71,9 +70,9 @@
     height: 20px;
   }
 
-  &:focus-visible {
-    outline: 2px solid color.$green-600;
-    outline-offset: 2px;
+  &:hover {
+    border: 2px solid color.$green-600;
+    border-radius: 8px;
   }
 }
 
@@ -127,8 +126,8 @@
   }
 
   &:focus-visible {
-    outline: 2px solid color.$green-600;
-    outline-offset: 2px;
+    border-radius: 6%;
+    outline-offset: 4px;
   }
 }
 
