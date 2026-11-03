@@ -10,5 +10,10 @@ public interface IOrderRepository
     Task<IEnumerable<Order>> GetOrdersByCustomerIdAsync(string customerId);
     Task<Order?> GetOrderByReservationIdAsync(string reservationId);
     Task SaveOrderAsync(Order order);
+    Task SubmitGroupReservationAtomicallyAsync(
+        Order order,
+        GroupReservation groupReservation,
+        OrderStatus expectedOrderStatus,
+        GroupReservationStatus expectedGroupReservationStatus,
+        long? expectedSubmissionRevision);
 }
-

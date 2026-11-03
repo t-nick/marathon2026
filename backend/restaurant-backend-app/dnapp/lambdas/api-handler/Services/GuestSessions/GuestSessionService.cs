@@ -1,4 +1,5 @@
 using Amazon.CognitoIdentityProvider.Model;
+using Amazon.DynamoDBv2.Model;
 using APIHandler.Constants;
 using APIHandler.Constants.Dishes;
 using APIHandler.Constants.Orders;
@@ -217,12 +218,18 @@ public class GuestSessionService(
 
         foreach (var guestSession in sessions)
         {
-            var items = guestSession.Dishes.Select(d => new ParticipantItem(
-                new ParticipantDish(
-                    dishesById[d.DishId].Id,
-                    dishesById[d.DishId].Name,
-                    dishesById[d.DishId].Price),
-                d.Quantity)).ToArray();
+            var items = new List<ParticipantItem>();
+            foreach (var savedDish in guestSession.Dishes)
+            {
+                // Forced deletion can leave a saved dish ID without a corresponding dish record.
+                // No dish details or price are persisted with the session, so omit that item.
+                if (!dishesById.TryGetValue(savedDish.DishId, out var dish))
+                    continue;
+
+                items.Add(new ParticipantItem(
+                    new ParticipantDish(dish.Id, dish.Name, dish.Price),
+                    savedDish.Quantity));
+            }
 
             decimal total = items.Sum(i => i.Quantity * i.Dish.Price);
             var participant = new Participant(
@@ -247,7 +254,16 @@ public class GuestSessionService(
         await ValidateDishesAsync(guestSession.Dishes);
 
         guestSession.IsSubmitted = true;
-        await guestSessionRepository.SaveAsync(guestSession);
+        try
+        {
+            await guestSessionRepository.SaveAsync(guestSession);
+        }
+        catch (TransactionCanceledException)
+        {
+            // Revalidate after the transaction loses a race with group submission.
+            await GetGroupReservationAndValidateAsync(guestSession.GroupReservationId);
+            throw;
+        }
     }
 
     private async Task<GroupReservation> GetGroupReservationAndValidateAsync(string groupReservationId)
@@ -380,5 +396,25 @@ public class GuestSessionService(
         return new GetGuestSessionResponse(name, items, total, session.IsSubmitted);
     }
 
-}
+    public async Task<string> GetOwnerGuestSessionIdAsync(string userId, string reservationId)
+    {
+        var reservation = await reservationRepository.GetReservationByIdAsync(reservationId)
+            ?? throw new ReservationNotFoundException($"Reservation '{reservationId}' was not found.");
 
+        if (!string.Equals(reservation.CustomerId, userId, StringComparison.OrdinalIgnoreCase))
+            throw new ActionForbiddenException("Only the reservation owner can access the owner guest session.");
+
+        var groupReservation = await groupReservationRepository.GetByReservationIdAsync(reservationId)
+            ?? throw new GroupReservationNotFoundException();
+
+        var sessions = await guestSessionRepository.GetAllByGroupReservationIdAsync(groupReservation.GroupReservationId);
+        var ownerSession = sessions.FirstOrDefault(session =>
+            session.IsOwnerSession &&
+            (string.IsNullOrEmpty(session.OwnerUserId) ||
+             string.Equals(session.OwnerUserId, userId, StringComparison.OrdinalIgnoreCase)));
+
+        return ownerSession?.Id
+            ?? throw new GuestSessionNotFoundException("Owner guest session was not found.");
+    }
+
+}

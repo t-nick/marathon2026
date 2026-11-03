@@ -17,4 +17,7 @@ public class GroupReservation
 
     [DynamoDBProperty("status")]
     public GroupReservationStatus Status { get; set; }
+
+    [DynamoDBProperty("submissionRevision")]
+    public long? SubmissionRevision { get; set; }
 }
