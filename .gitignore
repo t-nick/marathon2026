@@ -27,6 +27,7 @@ crash.*.log
 homework-backend.md
 # .github/agents
 .github/skills
+.syndicate-config-local/
 .nvmrc
 frontend/restaurant-frontend-app/dist
 backend/restaurant-backend-app/docs/plan/*

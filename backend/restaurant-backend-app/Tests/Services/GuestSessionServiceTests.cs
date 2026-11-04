@@ -8,6 +8,7 @@ using APIHandler.Repositories.Auth;
 using APIHandler.Repositories.Dishes;
 using APIHandler.Repositories.GroupReservations;
 using APIHandler.Repositories.GuestSessions;
+using APIHandler.Repositories.Orders;
 using APIHandler.Repositories.Reservations;
 using APIHandler.Repositories.Tables;
 using APIHandler.Services.GuestSessions;
@@ -27,6 +28,7 @@ public class GuestSessionServiceTests
     private readonly Mock<IReservationRepository> _mockReservationRepository = new();
     private readonly Mock<IUserRepository> _mockUserRepository = new();
     private readonly Mock<ITableRepository> _mockTableRepository = new();
+    private readonly Mock<IOrderRepository> _mockOrderRepository = new();
     private readonly GuestSessionService _guestSessionService;
 
     public GuestSessionServiceTests()
@@ -37,7 +39,8 @@ public class GuestSessionServiceTests
             _mockDishRepository.Object,
             _mockReservationRepository.Object,
             _mockUserRepository.Object,
-            _mockTableRepository.Object);
+            _mockTableRepository.Object,
+            _mockOrderRepository.Object);
     }
 
     [Fact]
@@ -444,7 +447,7 @@ public class GuestSessionServiceTests
     }
 
     [Fact]
-    public async Task GetOwnerGuestSessionIdAsync_OwnerSessionNotFound_ThrowsNotFound()
+    public async Task GetOwnerGuestSessionIdAsync_OwnerSessionNotFound_CreatesOwnerSession()
     {
         const string reservationId = "reservation-1";
         const string groupReservationId = "group-1";
@@ -479,8 +482,20 @@ public class GuestSessionServiceTests
                 }
             ]);
 
-        await Assert.ThrowsAsync<GuestSessionNotFoundException>(
-            () => _guestSessionService.GetOwnerGuestSessionIdAsync("owner-user", reservationId));
+        GuestSession? savedSession = null;
+        _mockGuestSessionRepository
+            .Setup(repository => repository.SaveAsync(It.IsAny<GuestSession>()))
+            .Callback<GuestSession>(session => savedSession = session);
+
+        string guestSessionId =
+            await _guestSessionService.GetOwnerGuestSessionIdAsync("owner-user", reservationId);
+
+        Assert.NotNull(savedSession);
+        Assert.Equal(guestSessionId, savedSession.Id);
+        Assert.Equal(groupReservationId, savedSession.GroupReservationId);
+        Assert.Equal("owner-user", savedSession.OwnerUserId);
+        Assert.True(savedSession.IsOwnerSession);
+        Assert.Empty(savedSession.Dishes);
     }
 
     [Theory]
@@ -1157,8 +1172,8 @@ public class GuestSessionServiceTests
                 GuestName = "Owner",
                 IsOwnerSession = true,
                 OwnerUserId = ownerUserId,
-                IsSubmitted = true,
-                Dishes = [new OrderItem { DishId = ownerDish.Id, Quantity = 2 }]
+                IsSubmitted = false,
+                Dishes = []
             },
             new()
             {
@@ -1182,6 +1197,18 @@ public class GuestSessionServiceTests
         _mockGuestSessionRepository
             .Setup(r => r.GetAllByGroupReservationIdAsync(groupReservationId))
             .ReturnsAsync(sessions);
+        _mockOrderRepository
+            .Setup(r => r.GetOrderByReservationIdAsync(reservationId))
+            .ReturnsAsync(new Order
+            {
+                OrderId = "owner-order",
+                CustomerId = ownerUserId,
+                ReservationId = reservationId,
+                ReservationAddress = "Main Street",
+                ReservationTime = "7:00 PM",
+                Dishes = [new OrderItem { DishId = ownerDish.Id, Quantity = 2 }],
+                Status = OrderStatus.Created
+            });
         _mockDishRepository
             .Setup(r => r.GetDishesByIdsAsync(It.Is<IEnumerable<string>>(ids =>
                 ids.Count() == 2 && ids.Contains(ownerDish.Id) && ids.Contains(guestDish.Id))))
@@ -1201,7 +1228,7 @@ public class GuestSessionServiceTests
         var owner = Assert.Single(participants, p => p.Id == "owner-session");
         Assert.Equal(ParticipantType.Owner, owner.Type);
         Assert.Equal("Alex", owner.Name);
-        Assert.True(owner.IsSubmitted);
+        Assert.False(owner.IsSubmitted);
         Assert.Equal(25m, owner.Total);
         var ownerItem = Assert.Single(owner.Items);
         Assert.Equal(ownerDish.Id, ownerItem.Dish.Id);

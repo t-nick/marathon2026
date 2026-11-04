@@ -6,6 +6,16 @@ namespace APIHandler.Entities;
 
 public class GuestSession
 {
+    public static GuestSession CreateOwnerSession(string groupReservationId, string ownerUserId) => new()
+    {
+        Id = $"owner-{groupReservationId}",
+        GroupReservationId = groupReservationId,
+        GuestName = "Owner",
+        Dishes = [],
+        IsOwnerSession = true,
+        OwnerUserId = ownerUserId
+    };
+
     [DynamoDBHashKey("guestSessionId")]
     public required string Id { get; set; }
 

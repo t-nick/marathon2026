@@ -12,10 +12,11 @@ describe('tokenInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
   let toastService: jasmine.SpyObj<ToastService>;
+  let authService: jasmine.SpyObj<AuthenticationService>;
 
   beforeEach(() => {
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['error']);
-    const authService = jasmine.createSpyObj<AuthenticationService>('AuthenticationService', [
+    authService = jasmine.createSpyObj<AuthenticationService>('AuthenticationService', [
       'getTokens',
     ]);
     authService.getTokens.and.returnValue(null);
@@ -59,5 +60,37 @@ describe('tokenInterceptor', () => {
 
     expect(toastService.error).not.toHaveBeenCalled();
     expect(receivedStatus).toBe(400);
+  });
+
+  it('adds the owner JWT to the group sessions request', () => {
+    authService.getTokens.and.returnValue({ idToken: 'owner-id-token', accessToken: 'access-token' });
+
+    http.get('https://test.api/guest/groups/group-1/sessions').subscribe();
+
+    const request = httpMock.expectOne('https://test.api/guest/groups/group-1/sessions');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer owner-id-token');
+    request.flush({ participants: [], total: 0 });
+  });
+
+  it('adds the owner JWT to the remove participant request', () => {
+    authService.getTokens.and.returnValue({ idToken: 'owner-id-token', accessToken: 'access-token' });
+
+    http.delete('https://test.api/guest/groups/group-1/sessions/guest-1').subscribe();
+
+    const request = httpMock.expectOne('https://test.api/guest/groups/group-1/sessions/guest-1');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer owner-id-token');
+    request.flush({ participants: [], total: 0 });
+  });
+
+  it('keeps guest-session authorization handling unchanged', () => {
+    authService.getTokens.and.returnValue({ idToken: 'owner-id-token', accessToken: 'access-token' });
+
+    http.get('https://test.api/guest/sessions/guest-1/menu', {
+      headers: { Authorization: 'Bearer guest-session-token' },
+    }).subscribe();
+
+    const request = httpMock.expectOne('https://test.api/guest/sessions/guest-1/menu');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer guest-session-token');
+    request.flush({});
   });
 });

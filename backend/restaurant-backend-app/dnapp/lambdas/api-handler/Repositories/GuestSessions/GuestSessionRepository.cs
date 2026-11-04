@@ -22,7 +22,8 @@ public class GuestSessionRepository : IGuestSessionRepository
 
     public async Task<GuestSession?> GetByGuestSessionId(string id) => await _context.LoadAsync<GuestSession?>(id, new LoadConfig()
     {
-        OverrideTableName = ResourceNames.GuestSessionTableName
+        OverrideTableName = ResourceNames.GuestSessionTableName,
+        ConsistentRead = true
     });
 
     public async Task<GuestSession?> GetByGroupReservationId(string groupReservationId)
@@ -130,7 +131,7 @@ public class GuestSessionRepository : IGuestSessionRepository
             IndexName = GlobalSecondaryIndexes.GuestSession.GroupReservationId
         }).GetRemainingAsync();
 
-        return result.Count;
+        return result.Count(session => !session.IsOwnerSession);
     }
 
     public async Task DeleteAsync(GuestSession session)

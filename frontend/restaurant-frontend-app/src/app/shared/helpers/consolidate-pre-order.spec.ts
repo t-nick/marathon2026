@@ -22,6 +22,15 @@ describe('consolidatePreOrder', () => {
     expect(result).toEqual({ items: [{ dish: caesar, quantity: 2 }], total: 360 });
   });
 
+  it('includes the owner order even when the owner session is not marked submitted', () => {
+    const result = consolidatePreOrder([
+      { ...guest('Owner', false, [{ dish: caesar, quantity: 2 }]), type: 'Owner' },
+      guest('Andrii', false, [{ dish: tomYum, quantity: 1 }]),
+    ]);
+
+    expect(result).toEqual({ items: [{ dish: caesar, quantity: 2 }], total: 360 });
+  });
+
   it('merges the same dish from different participants', () => {
     const result = consolidatePreOrder([
       guest('Andrii', true, [{ dish: caesar, quantity: 2 }]),
