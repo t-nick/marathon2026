@@ -44,48 +44,66 @@
         </span>
       </div>
     </header>
+    <section class="sync-controls" aria-live="polite">
+      @if (updatedAt(); as timestamp) {
+        <span>Updated at {{ timestamp | date: 'HH:mm:ss' }}</span>
+        <button
+          class="secondary-button"
+          type="button"
+          [disabled]="isRefreshing() || groupStatus() !== 'Open'"
+          (click)="refreshNow()"
+        >
+          Refresh
+        </button>
+        @if (refreshFailed()) {
+          <span class="refresh-error" role="status">
+            Couldn't refresh. Showing data from {{ timestamp | date: 'HH:mm:ss' }}
+          </span>
+        }
+      }
+    </section>
     <section class="scroll-container">
-        @if (pendingParticipantsCount() > 0) {
+      @if (pendingParticipantsCount() > 0) {
         <aside class="pending-notice">
-            {{ pendingParticipantsCount() }}
-            {{ pendingParticipantsCount() === 1 ? 'participant hasn’t' : 'participants haven’t' }}
-            submitted their cart yet — their dishes won’t be included in the order
+          {{ pendingParticipantsCount() }}
+          {{ pendingParticipantsCount() === 1 ? 'participant hasn’t' : 'participants haven’t' }}
+          submitted their cart yet — their dishes won’t be included in the order
         </aside>
-        }
+      }
 
-        @if (!hasAnyDishes()) {
+      @if (!hasAnyDishes()) {
         <p class="empty-state">Participants haven’t added any dishes yet</p>
-        }
+      }
 
-        <ul class="participants" aria-label="Group order participants">
+      <ul class="participants" aria-label="Group order participants">
         @for (person of participants(); track person.id) {
-            <li>
+          <li>
             <app-participant-card
-                [participant]="person"
-                [isOwner]="person.id === ownerSessionId()"
-                [canRemove]="groupStatus() === 'Open' && person.type === 'Guest'"
-                [isReadOnly]="groupStatus() !== 'Open'"
-                (editClick)="editOwnerPreOrder()"
+              [participant]="person"
+              [isOwner]="person.id === ownerSessionId()"
+              [canRemove]="groupStatus() === 'Open' && person.type === 'Guest'"
+              [isReadOnly]="groupStatus() !== 'Open'"
+              (editClick)="editOwnerPreOrder()"
             />
-            </li>
+          </li>
         }
-        </ul>
+      </ul>
 
-        <section class="consolidated-order" aria-labelledby="consolidated-title">
+      <section class="consolidated-order" aria-labelledby="consolidated-title">
         <h2 id="consolidated-title">Consolidated pre-order</h2>
         @if (consolidatedOrder().items.length) {
-            <ul class="consolidated-items">
+          <ul class="consolidated-items">
             @for (item of consolidatedOrder().items; track item.dish.id) {
-                <li>
+              <li>
                 <span>{{ item.dish.name }} × {{ item.quantity }}</span>
                 <strong>{{ item.dish.price * item.quantity | currency }}</strong>
-                </li>
+              </li>
             }
-            </ul>
+          </ul>
         } @else {
-            <p class="empty-state">Participants haven’t added any dishes yet</p>
+          <p class="empty-state">Participants haven’t added any dishes yet</p>
         }
-        </section>
+      </section>
     </section>
     <footer class="grand-total">
       <span class="grand-total-label">Grand Total</span>
@@ -96,7 +114,9 @@
       <button
         class="submit-button"
         type="button"
-        [disabled]="!hasSubmittedGuest() || consolidatedOrder().items.length === 0 || isSubmitting()"
+        [disabled]="
+          !hasSubmittedGuest() || consolidatedOrder().items.length === 0 || isSubmitting()
+        "
         (click)="openSubmitConfirmation()"
       >
         Submit Pre-Order

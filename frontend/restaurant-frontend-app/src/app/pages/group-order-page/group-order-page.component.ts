@@ -1,12 +1,34 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnDestroy,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { EMPTY, catchError, finalize, forkJoin, map, switchMap, tap } from 'rxjs';
+import {
+  EMPTY,
+  Subscription,
+  catchError,
+  exhaustMap,
+  finalize,
+  forkJoin,
+  map,
+  switchMap,
+  tap,
+  timer,
+} from 'rxjs';
 import { ParticipantCardComponent } from '@app/components/group-orders/participant-card/participant-card.component';
 import { ModalComponent } from '@app/shared/custom-components/modal/modal.component';
 import { consolidatePreOrder } from '@app/shared/helpers/consolidate-pre-order';
-import { GroupStatusResponse, GroupReservationStatus } from '@app/models/group-orders/group-status.model';
+import {
+  GroupStatusResponse,
+  GroupReservationStatus,
+} from '@app/models/group-orders/group-status.model';
 import { Participant } from '@app/models/group-orders/participant.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
@@ -20,7 +42,7 @@ import { ToastService } from '@app/services/toast/toast.service';
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './group-order-page.component.scss',
 })
-export class GroupOrderPageComponent implements OnInit {
+export class GroupOrderPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly groupOrdersService = inject(GroupOrdersService);
@@ -36,22 +58,38 @@ export class GroupOrderPageComponent implements OnInit {
   readonly loadError = signal('');
   readonly isSubmitting = signal(false);
   readonly isConfirmOpen = signal(false);
+  readonly isRefreshing = signal(false);
+  readonly updatedAt = signal<Date | null>(null);
+  readonly refreshFailed = signal(false);
   readonly consolidatedOrder = computed(() => consolidatePreOrder(this.participants()));
   readonly pendingParticipantsCount = computed(
-    () => this.participants().filter((participant) => participant.type === 'Guest' && !participant.isSubmitted).length,
+    () =>
+      this.participants().filter(
+        (participant) => participant.type === 'Guest' && !participant.isSubmitted
+      ).length
   );
-  readonly hasSubmittedGuest = computed(
-    () => this.participants().some((participant) => participant.type === 'Guest' && participant.isSubmitted),
+  readonly hasSubmittedGuest = computed(() =>
+    this.participants().some(
+      (participant) => participant.type === 'Guest' && participant.isSubmitted
+    )
   );
-  readonly hasAnyDishes = computed(
-    () => this.participants().some((participant) => participant.items.length > 0),
+  readonly hasAnyDishes = computed(() =>
+    this.participants().some((participant) => participant.items.length > 0)
   );
+
+  private pollingSubscription?: Subscription;
 
   ngOnInit(): void {
     this.loadData();
   }
 
+  ngOnDestroy(): void {
+    this.stopPolling();
+  }
+
   loadData(): void {
+    this.stopPolling();
+
     if (!this.reservationId) {
       this.loading.set(false);
       this.loadError.set('Group reservation not found');
@@ -70,25 +108,78 @@ export class GroupOrderPageComponent implements OnInit {
           forkJoin({
             sessions: this.groupOrdersService.getSessions$(invite.GroupReservationId),
             status: this.groupOrdersService.getStatus$(invite.GroupReservationId),
-          }).pipe(map(({ sessions, status }) => ({ invite, ownerSessionId, sessions, status }))),
+          }).pipe(map(({ sessions, status }) => ({ invite, ownerSessionId, sessions, status })))
         ),
         tap(({ invite, ownerSessionId, sessions, status }) => {
           this.invite.set(invite);
           this.ownerSessionId.set(ownerSessionId);
           this.participants.set(sessions.participants);
           this.groupStatus.set(status.status);
+          this.updatedAt.set(new Date());
+          this.refreshFailed.set(false);
+          if (status.status === 'Open') {
+            this.startPolling(invite.GroupReservationId);
+          }
         }),
         catchError((error: unknown) => {
           this.loadError.set(
             error instanceof HttpErrorResponse && error.status === 404
               ? 'Group reservation not found'
-              : 'Unable to load group reservation. Please try again.',
+              : 'Unable to load group reservation. Please try again.'
           );
           return EMPTY;
         }),
-        finalize(() => this.loading.set(false)),
+        finalize(() => this.loading.set(false))
       )
       .subscribe();
+  }
+
+  refreshNow(): void {
+    const invite = this.invite();
+    if (!invite || this.groupStatus() !== 'Open' || this.isRefreshing()) {
+      return;
+    }
+
+    this.refreshGroupData(invite.GroupReservationId).subscribe();
+  }
+
+  private startPolling(groupReservationId: string): void {
+    this.stopPolling();
+    this.pollingSubscription = timer(15_000, 15_000)
+      .pipe(exhaustMap(() => this.refreshGroupData(groupReservationId)))
+      .subscribe();
+  }
+
+  private stopPolling(): void {
+    this.pollingSubscription?.unsubscribe();
+    this.pollingSubscription = undefined;
+  }
+
+  private refreshGroupData(groupReservationId: string) {
+    if (this.isRefreshing() || this.groupStatus() !== 'Open') {
+      return EMPTY;
+    }
+
+    this.isRefreshing.set(true);
+    return forkJoin({
+      sessions: this.groupOrdersService.getSessions$(groupReservationId, { silent: true }),
+      status: this.groupOrdersService.getStatus$(groupReservationId, { silent: true }),
+    }).pipe(
+      tap(({ sessions, status }) => {
+        this.participants.set(sessions.participants);
+        this.groupStatus.set(status.status);
+        this.updatedAt.set(new Date());
+        this.refreshFailed.set(false);
+        if (status.status !== 'Open') {
+          this.stopPolling();
+        }
+      }),
+      catchError(() => {
+        this.refreshFailed.set(true);
+        return EMPTY;
+      }),
+      finalize(() => this.isRefreshing.set(false))
+    );
   }
 
   editOwnerPreOrder(): void {
@@ -118,7 +209,11 @@ export class GroupOrderPageComponent implements OnInit {
   }
 
   openSubmitConfirmation(): void {
-    if (!this.isSubmitting() && this.hasSubmittedGuest() && this.consolidatedOrder().items.length > 0) {
+    if (
+      !this.isSubmitting() &&
+      this.hasSubmittedGuest() &&
+      this.consolidatedOrder().items.length > 0
+    ) {
       this.isConfirmOpen.set(true);
     }
   }
@@ -146,12 +241,13 @@ export class GroupOrderPageComponent implements OnInit {
       .submit$(invite.GroupReservationId, this.reservationId)
       .pipe(
         tap(() => {
+          this.stopPolling();
           this.groupStatus.set('Submitted');
           this.isConfirmOpen.set(false);
           this.toast.success('Pre-order sent to the restaurant');
         }),
         catchError(() => EMPTY),
-        finalize(() => this.isSubmitting.set(false)),
+        finalize(() => this.isSubmitting.set(false))
       )
       .subscribe();
   }

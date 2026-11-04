@@ -71,6 +71,21 @@
   }
 }
 
+.sync-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 0;
+  color: color.$neutral-600;
+  font-size: 0.875rem;
+}
+
+.refresh-error {
+  flex-basis: 100%;
+  color: color.$orange-600;
+}
+
 .participants {
   display: grid;
   gap: 20px;

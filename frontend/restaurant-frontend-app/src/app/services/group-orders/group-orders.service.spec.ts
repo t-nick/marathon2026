@@ -3,6 +3,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { SKIP_ERROR_TOAST } from '@app/auth/skip-error-toast.context';
 import { API_BASE_URL } from '@app/shared/config/api-base-url.token';
 import { GroupOrdersService } from './group-orders.service';
 
@@ -14,7 +15,11 @@ describe('Рівень 2 · GroupOrdersService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: API_BASE_URL, useValue: BASE_URL }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: BASE_URL },
+      ],
     });
     service = TestBed.inject(GroupOrdersService);
     http = TestBed.inject(HttpTestingController);
@@ -36,6 +41,14 @@ describe('Рівень 2 · GroupOrdersService', () => {
     service.getSessions$('grp-1').subscribe();
     const req = http.expectOne(`${BASE_URL}/guest/groups/grp-1/sessions`);
     expect(req.request.method).toBe('GET');
+    expect(req.request.context.get(SKIP_ERROR_TOAST)).toBeFalse();
+    req.flush({ participants: [], total: 0 });
+  });
+
+  it('getSessions$ silent mode skips error toasts', () => {
+    service.getSessions$('grp-1', { silent: true }).subscribe();
+    const req = http.expectOne(`${BASE_URL}/guest/groups/grp-1/sessions`);
+    expect(req.request.context.get(SKIP_ERROR_TOAST)).toBeTrue();
     req.flush({ participants: [], total: 0 });
   });
 
@@ -52,6 +65,14 @@ describe('Рівень 2 · GroupOrdersService', () => {
     service.getStatus$('grp-1').subscribe();
     const req = http.expectOne(`${BASE_URL}/guest/groups/grp-1/status`);
     expect(req.request.method).toBe('GET');
+    expect(req.request.context.get(SKIP_ERROR_TOAST)).toBeFalse();
+    req.flush({ currentParticipants: 3, maxCapacity: 5, status: 'Open' });
+  });
+
+  it('getStatus$ silent mode skips error toasts', () => {
+    service.getStatus$('grp-1', { silent: true }).subscribe();
+    const req = http.expectOne(`${BASE_URL}/guest/groups/grp-1/status`);
+    expect(req.request.context.get(SKIP_ERROR_TOAST)).toBeTrue();
     req.flush({ currentParticipants: 3, maxCapacity: 5, status: 'Open' });
   });
 
@@ -62,5 +83,4 @@ describe('Рівень 2 · GroupOrdersService', () => {
     expect(req.request.body).toEqual({ reservationId: 'res-1' });
     req.flush([]);
   });
-
 });
