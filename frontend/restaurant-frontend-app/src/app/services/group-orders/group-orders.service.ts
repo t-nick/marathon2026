@@ -49,6 +49,15 @@ export class GroupOrdersService {
     );
   }
 
+  removeSession$(
+    groupReservationId: string,
+    guestSessionId: string
+  ): Observable<GroupSessionsResponse> {
+    return this.http.delete<GroupSessionsResponse>(
+      `${this.baseUrl}/guest/groups/${encodeURIComponent(groupReservationId)}/sessions/${encodeURIComponent(guestSessionId)}`
+    );
+  }
+
   submit$(groupReservationId: string, reservationId: string): Observable<SubmittedDish[]> {
     return this.http.post<SubmittedDish[]>(
       `${this.baseUrl}/group-reservations/${encodeURIComponent(groupReservationId)}/submit`,

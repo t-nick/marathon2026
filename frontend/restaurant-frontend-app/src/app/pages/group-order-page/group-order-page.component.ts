@@ -58,6 +58,8 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   readonly loadError = signal('');
   readonly isSubmitting = signal(false);
   readonly isConfirmOpen = signal(false);
+  readonly guestToRemove = signal<Participant | null>(null);
+  readonly isRemovingGuest = signal(false);
   readonly isRefreshing = signal(false);
   readonly updatedAt = signal<Date | null>(null);
   readonly refreshFailed = signal(false);
@@ -136,11 +138,59 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
 
   refreshNow(): void {
     const invite = this.invite();
-    if (!invite || this.groupStatus() !== 'Open' || this.isRefreshing()) {
+    if (!invite || this.groupStatus() !== 'Open' || this.isRefreshing() || this.isRemovingGuest()) {
       return;
     }
 
     this.refreshGroupData(invite.GroupReservationId).subscribe();
+  }
+
+  requestRemoveGuest(participant: Participant): void {
+    if (
+      participant.type === 'Guest' &&
+      this.groupStatus() === 'Open' &&
+      !this.isRemovingGuest() &&
+      !this.isRefreshing()
+    ) {
+      this.guestToRemove.set(participant);
+    }
+  }
+
+  cancelRemoveGuest(): void {
+    if (!this.isRemovingGuest()) {
+      this.guestToRemove.set(null);
+    }
+  }
+
+  confirmRemoveGuest(): void {
+    const invite = this.invite();
+    const participant = this.guestToRemove();
+    if (
+      !invite ||
+      !participant ||
+      participant.type !== 'Guest' ||
+      this.groupStatus() !== 'Open' ||
+      this.isRemovingGuest() ||
+      this.isRefreshing()
+    ) {
+      return;
+    }
+
+    this.isRemovingGuest.set(true);
+    this.groupOrdersService
+      .removeSession$(invite.GroupReservationId, participant.id)
+      .pipe(
+        tap((sessions) => {
+          this.participants.set(sessions.participants);
+          this.updatedAt.set(new Date());
+          this.refreshFailed.set(false);
+          this.guestToRemove.set(null);
+          this.toast.success(`${participant.name} was removed from the group.`);
+        }),
+        catchError(() => EMPTY),
+        finalize(() => this.isRemovingGuest.set(false))
+      )
+      .subscribe();
   }
 
   private startPolling(groupReservationId: string): void {
@@ -156,7 +206,7 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   }
 
   private refreshGroupData(groupReservationId: string) {
-    if (this.isRefreshing() || this.groupStatus() !== 'Open') {
+    if (this.isRefreshing() || this.isRemovingGuest() || this.groupStatus() !== 'Open') {
       return EMPTY;
     }
 

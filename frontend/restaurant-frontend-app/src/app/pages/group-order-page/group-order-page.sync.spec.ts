@@ -79,12 +79,14 @@ describe('GroupOrderPageComponent background sync', () => {
       'getOwnerSessionId$',
       'getStatus$',
       'submit$',
+      'removeSession$',
     ]);
     service.getGroupInvite$.and.returnValue(of(INVITE));
     service.getSessions$.and.returnValue(of(SESSIONS));
     service.getOwnerSessionId$.and.returnValue(of('owner-1'));
     service.getStatus$.and.returnValue(of(STATUS_OPEN));
     service.submit$.and.returnValue(of([]));
+    service.removeSession$.and.returnValue(of(SESSIONS));
   });
 
   afterEach(() => fixture?.componentFixture.destroy());

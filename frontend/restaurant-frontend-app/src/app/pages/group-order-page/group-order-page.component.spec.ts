@@ -9,7 +9,10 @@ import { ReservationService } from '@app/services/reservation/reservation.servic
 import { ToastService } from '@app/services/toast/toast.service';
 import { GroupSessionsResponse } from '@app/models/group-orders/group-sessions-response.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
-import { ReservationCustomer, ReservationStatusCustomer } from '@app/models/reservations/reservation.model';
+import {
+  ReservationCustomer,
+  ReservationStatusCustomer,
+} from '@app/models/reservations/reservation.model';
 import { GroupOrderPageComponent } from './group-order-page.component';
 
 const caesar = { id: 'dish1', name: 'Caesar Salad', price: 180 };
@@ -17,9 +20,30 @@ const tomYum = { id: 'dish2', name: 'Tom Yum', price: 220 };
 
 const SESSIONS: GroupSessionsResponse = {
   participants: [
-    { id: 'owner', type: 'Owner', name: 'Yevhenii', isSubmitted: true, total: 180, items: [{ dish: caesar, quantity: 1 }] },
-    { id: 'andrii', type: 'Guest', name: 'Andrii', isSubmitted: true, total: 360, items: [{ dish: caesar, quantity: 2 }] },
-    { id: 'olena', type: 'Guest', name: 'Olena', isSubmitted: false, total: 220, items: [{ dish: tomYum, quantity: 1 }] },
+    {
+      id: 'owner',
+      type: 'Owner',
+      name: 'Yevhenii',
+      isSubmitted: true,
+      total: 180,
+      items: [{ dish: caesar, quantity: 1 }],
+    },
+    {
+      id: 'andrii',
+      type: 'Guest',
+      name: 'Andrii',
+      isSubmitted: true,
+      total: 360,
+      items: [{ dish: caesar, quantity: 2 }],
+    },
+    {
+      id: 'olena',
+      type: 'Guest',
+      name: 'Olena',
+      isSubmitted: false,
+      total: 220,
+      items: [{ dish: tomYum, quantity: 1 }],
+    },
   ],
   total: 760,
 };
@@ -32,7 +56,9 @@ const INVITE = {
 } as GuestInvite;
 
 function buttonByText(root: ParentNode, text: string): HTMLButtonElement | undefined {
-  return [...root.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) as HTMLButtonElement | undefined;
+  return [...root.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) as
+    | HTMLButtonElement
+    | undefined;
 }
 
 describe('Рівень 2 · сторінка Owner Review', () => {
@@ -47,8 +73,14 @@ describe('Рівень 2 · сторінка Owner Review', () => {
         { provide: GroupOrdersService, useValue: service },
         { provide: ReservationService, useValue: reservationService },
         { provide: Router, useValue: router },
-        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error', 'info']) },
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ reservationId: 'res-1' }) } } },
+        {
+          provide: ToastService,
+          useValue: jasmine.createSpyObj('ToastService', ['success', 'error', 'info']),
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: convertToParamMap({ reservationId: 'res-1' }) } },
+        },
       ],
     });
     const fixture = TestBed.createComponent(GroupOrderPageComponent);
@@ -57,7 +89,9 @@ describe('Рівень 2 · сторінка Owner Review', () => {
   }
 
   beforeEach(() => {
-    reservationService = jasmine.createSpyObj<ReservationService>('ReservationService', ['getReservationById']);
+    reservationService = jasmine.createSpyObj<ReservationService>('ReservationService', [
+      'getReservationById',
+    ]);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     reservationService.getReservationById.and.returnValue(
       of({
@@ -70,15 +104,23 @@ describe('Рівень 2 · сторінка Owner Review', () => {
         restaurantName: 'Green & Tasty',
         locationAddress: '9 Abashidze Street',
         waiterId: 'waiter-1',
-      } as ReservationCustomer),
+      } as ReservationCustomer)
     );
     service = jasmine.createSpyObj<GroupOrdersService>('GroupOrdersService', [
-      'getGroupInvite$', 'getSessions$', 'getOwnerSessionId$', 'getStatus$', 'submit$',
+      'getGroupInvite$',
+      'getSessions$',
+      'getOwnerSessionId$',
+      'getStatus$',
+      'submit$',
+      'removeSession$',
     ]);
     service.getGroupInvite$.and.returnValue(of(INVITE));
     service.getSessions$.and.returnValue(of(structuredClone(SESSIONS)));
     service.getOwnerSessionId$.and.returnValue(of('owner'));
-    service.getStatus$.and.returnValue(of({ currentParticipants: 3, maxCapacity: 5, status: 'Open' as const }));
+    service.getStatus$.and.returnValue(
+      of({ currentParticipants: 3, maxCapacity: 5, status: 'Open' as const })
+    );
+    service.removeSession$.and.returnValue(of(structuredClone(SESSIONS)));
   });
 
   describe('дані', () => {
@@ -117,7 +159,6 @@ describe('Рівень 2 · сторінка Owner Review', () => {
         },
       });
     });
-
   });
 
   describe('консолідоване замовлення — головна пастка', () => {
@@ -145,12 +186,16 @@ describe('Рівень 2 · сторінка Owner Review', () => {
     });
 
     it('404: «Group reservation not found»', () => {
-      service.getGroupInvite$.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      service.getGroupInvite$.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404 }))
+      );
       expect(create().element.textContent).toContain('Group reservation not found');
     });
 
     it('інша помилка: кнопка «Try again» вантажить ще раз', () => {
-      service.getGroupInvite$.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      service.getGroupInvite$.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 }))
+      );
       const { fixture, element } = create();
       buttonByText(element, 'Try again')?.click();
       fixture.detectChanges();
@@ -206,6 +251,86 @@ describe('Рівень 2 · сторінка Owner Review', () => {
       fixture.detectChanges();
 
       expect(buttonByText(element, 'Submit Pre-Order')?.disabled).toBeFalse();
+    });
+
+    describe('Remove Guest', () => {
+      it('показує кнопку видалення лише для гостей відкритої групи', () => {
+        const { element, fixture } = create();
+
+        expect(element.querySelector('button[aria-label="Remove Andrii"]')).not.toBeNull();
+        expect(element.querySelector('button[aria-label="Remove Olena"]')).not.toBeNull();
+        expect(element.querySelector('button[aria-label="Remove Yevhenii"]')).toBeNull();
+
+        fixture.componentInstance.groupStatus.set('Submitted');
+        fixture.detectChanges();
+        expect(element.querySelector('button[aria-label="Remove Andrii"]')).toBeNull();
+        expect(element.querySelector('button[aria-label="Remove Olena"]')).toBeNull();
+      });
+
+      it('відкриває підтвердження з ім’ям гостя і не викликає API до підтвердження', () => {
+        const { element, fixture } = create();
+        element.querySelector<HTMLButtonElement>('button[aria-label="Remove Andrii"]')!.click();
+        fixture.detectChanges();
+
+        const dialog = element.querySelector('[role="dialog"]')!;
+        expect(dialog.getAttribute('aria-label')).toBe('Remove Guest');
+        expect(dialog.textContent).toContain(
+          'Are you sure you want to remove Andrii and their pre-order from this reservation? This action cannot be undone.'
+        );
+        expect(service.removeSession$).not.toHaveBeenCalled();
+      });
+
+      it('Cancel закриває діалог без видалення', () => {
+        const { element, fixture } = create();
+        element.querySelector<HTMLButtonElement>('button[aria-label="Remove Andrii"]')!.click();
+        fixture.detectChanges();
+        buttonByText(element.querySelector('[role="dialog"]')!, 'Cancel')!.click();
+        fixture.detectChanges();
+
+        expect(element.querySelector('[role="dialog"]')).toBeNull();
+        expect(service.removeSession$).not.toHaveBeenCalled();
+      });
+
+      it('передає id до API і оновлює учасників та суми відповіддю сервера', () => {
+        const updatedSnapshot: GroupSessionsResponse = {
+          participants: [
+            SESSIONS.participants[0],
+            { ...SESSIONS.participants[2], isSubmitted: true },
+          ],
+          total: 400,
+        };
+        service.removeSession$.and.returnValue(of(updatedSnapshot));
+        const { element, fixture } = create();
+        element.querySelector<HTMLButtonElement>('button[aria-label="Remove Andrii"]')!.click();
+        fixture.detectChanges();
+        buttonByText(element.querySelector('[role="dialog"]')!, 'Remove Guest')!.click();
+        fixture.detectChanges();
+
+        expect(service.removeSession$).toHaveBeenCalledOnceWith('grp-1', 'andrii');
+        expect(element.querySelectorAll('app-participant-card').length).toBe(2);
+        expect(element.textContent).not.toContain('Guest: Andrii');
+        expect(element.querySelector('.grand-total-value')?.textContent).toContain('$400.00');
+        expect(element.querySelector('[role="dialog"]')).toBeNull();
+      });
+
+      it('при помилці зберігає список і діалог, дозволяючи повторити спробу', () => {
+        service.removeSession$.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 400 }))
+        );
+        const { element, fixture } = create();
+        element.querySelector<HTMLButtonElement>('button[aria-label="Remove Andrii"]')!.click();
+        fixture.detectChanges();
+        const dialog = element.querySelector('[role="dialog"]')!;
+        buttonByText(dialog, 'Remove Guest')!.click();
+        fixture.detectChanges();
+
+        expect(element.querySelectorAll('app-participant-card').length).toBe(3);
+        expect(element.textContent).toContain('Guest: Andrii');
+        expect(element.querySelector('[role="dialog"]')).not.toBeNull();
+        expect(
+          buttonByText(element.querySelector('[role="dialog"]')!, 'Remove Guest')?.disabled
+        ).toBeFalse();
+      });
     });
   });
 });

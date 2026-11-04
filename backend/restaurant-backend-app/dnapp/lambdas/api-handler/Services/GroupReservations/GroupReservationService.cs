@@ -34,17 +34,9 @@ public class GroupReservationService(
         GroupReservation groupReservation = await groupReservationRepository.GetGroupReservationByTokenAsync(token)
             ?? throw new GroupReservationNotFoundException();
 
-        if (groupReservation.Status != GroupReservationStatus.Open)
-            throw new GroupReservationExpiredException();
-
-        Task<Reservation?> reservationTask = reservationRepository.GetReservationByIdAsync(groupReservation.ReservationId);
-        Task<int> countTask = guestSessionRepository.CountByGroupReservationId(groupReservation.GroupReservationId);
-
-        Reservation reservation = await reservationTask ?? throw new ValidationException("Associated reservation not found.");
-        int joinedGuestsCount = await countTask;
-
-        if (joinedGuestsCount + 1 >= reservation.GuestCount)
-            throw new GuestLimitExceededException();
+        // This endpoint only reads invite details; capacity and status are enforced when a guest creates a session.
+        Reservation reservation = await reservationRepository.GetReservationByIdAsync(groupReservation.ReservationId)
+            ?? throw new ValidationException("Associated reservation not found.");
 
         Table table = await tableRepository.GetTableAsync(reservation.TableId)
             ?? throw new InvalidOperationException("Associated table not found.");

@@ -10,9 +10,26 @@ const OLENA: Participant = {
   name: 'Olena',
   isSubmitted: false,
   total: 440,
-  items: [{ dish: { id: 'dish2', name: 'Tom Yum', price: 220, imageUrl: 'assets/img/dishes/spring-salad.jpg' }, quantity: 2 }],
+  items: [
+    {
+      dish: {
+        id: 'dish2',
+        name: 'Tom Yum',
+        price: 220,
+        imageUrl: 'assets/img/dishes/spring-salad.jpg',
+      },
+      quantity: 2,
+    },
+  ],
 };
-const OWNER: Participant = { id: 'owner', type: 'Owner', name: 'Yevhenii', isSubmitted: true, total: 0, items: [] };
+const OWNER: Participant = {
+  id: 'owner',
+  type: 'Owner',
+  name: 'Yevhenii',
+  isSubmitted: true,
+  total: 0,
+  items: [],
+};
 
 function render(participant: Participant): HTMLElement {
   const fixture = TestBed.createComponent(ParticipantCardComponent);
@@ -47,18 +64,20 @@ describe('Практичне · картка учасника', () => {
     fixture.detectChanges();
 
     const button: HTMLButtonElement | null = fixture.nativeElement.querySelector(
-      'button[aria-label="Remove Olena"]',
+      'button[aria-label="Remove Olena"]'
     );
     expect(button?.textContent).toContain('Remove Guest');
     button?.click();
-    expect(removeClick).toHaveBeenCalledTimes(1);
+    expect(removeClick).toHaveBeenCalledOnceWith(OLENA);
 
     const ownerFixture = TestBed.createComponent(ParticipantCardComponent);
     ownerFixture.componentRef.setInput('participant', OWNER);
     ownerFixture.componentRef.setInput('isOwner', true);
     ownerFixture.componentRef.setInput('canRemove', true);
     ownerFixture.detectChanges();
-    expect(ownerFixture.nativeElement.querySelector('button[aria-label="Remove Yevhenii"]')).toBeNull();
+    expect(
+      ownerFixture.nativeElement.querySelector('button[aria-label="Remove Yevhenii"]')
+    ).toBeNull();
   });
 
   describe('крок 1 · заголовок картки', () => {
@@ -112,8 +131,12 @@ describe('Практичне · картка учасника', () => {
       const avatar = row.querySelector('.avatar');
       expect(button).not.toBeNull();
       expect(avatar).not.toBeNull();
-      expect(button!.compareDocumentPosition(avatar!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(row.querySelector('.remove-dish-button img')?.getAttribute('src')).toBe('assets/svg/trash.svg');
+      expect(
+        button!.compareDocumentPosition(avatar!) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(row.querySelector('.remove-dish-button img')?.getAttribute('src')).toBe(
+        'assets/svg/trash.svg'
+      );
     }
 
     const button = rows[0].querySelector<HTMLButtonElement>('.remove-dish-button');

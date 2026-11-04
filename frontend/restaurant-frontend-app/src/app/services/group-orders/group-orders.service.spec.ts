@@ -76,6 +76,13 @@ describe('Рівень 2 · GroupOrdersService', () => {
     req.flush({ currentParticipants: 3, maxCapacity: 5, status: 'Open' });
   });
 
+  it('removeSession$: DELETE /guest/groups/{groupId}/sessions/{guestSessionId}', () => {
+    service.removeSession$('grp-1', 'guest-1').subscribe();
+    const req = http.expectOne(`${BASE_URL}/guest/groups/grp-1/sessions/guest-1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ participants: [], total: 0 });
+  });
+
   it('submit$: POST /group-reservations/{id}/submit з тілом { reservationId }', () => {
     service.submit$('grp-1', 'res-1').subscribe();
     const req = http.expectOne(`${BASE_URL}/group-reservations/grp-1/submit`);

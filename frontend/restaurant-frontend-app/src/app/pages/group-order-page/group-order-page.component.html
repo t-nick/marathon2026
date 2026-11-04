@@ -81,9 +81,15 @@
             <app-participant-card
               [participant]="person"
               [isOwner]="person.id === ownerSessionId()"
-              [canRemove]="groupStatus() === 'Open' && person.type === 'Guest'"
+              [canRemove]="
+                groupStatus() === 'Open' &&
+                person.type === 'Guest' &&
+                !isRemovingGuest() &&
+                !isRefreshing()
+              "
               [isReadOnly]="groupStatus() !== 'Open'"
               (editClick)="editOwnerPreOrder()"
+              (removeClick)="requestRemoveGuest($event)"
             />
           </li>
         }
@@ -142,6 +148,33 @@
             (click)="submitPreOrder()"
           >
             {{ isSubmitting() ? 'Submitting…' : 'Submit' }}
+          </button>
+        </div>
+      </app-modal>
+    }
+
+    @if (guestToRemove(); as guest) {
+      <app-modal title="Remove Guest" (closed)="cancelRemoveGuest()">
+        <p>
+          Are you sure you want to remove <strong>{{ guest.name }}</strong> and their pre-order from
+          this reservation? This action cannot be undone.
+        </p>
+        <div modal-actions class="dialog-actions">
+          <button
+            class="secondary-button"
+            type="button"
+            [disabled]="isRemovingGuest()"
+            (click)="cancelRemoveGuest()"
+          >
+            Cancel
+          </button>
+          <button
+            class="submit-button dialog-submit"
+            type="button"
+            [disabled]="isRemovingGuest()"
+            (click)="confirmRemoveGuest()"
+          >
+            {{ isRemovingGuest() ? 'Removing…' : 'Remove Guest' }}
           </button>
         </div>
       </app-modal>

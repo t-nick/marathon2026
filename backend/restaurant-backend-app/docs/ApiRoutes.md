@@ -1080,6 +1080,7 @@ Response: `200 OK`
 ## Group & Guest Reservations
 
 ### `GET` /guest/invites/{token}
+Returns invitation and reservation details even when the group is full or no longer open. Guest eligibility is checked when creating a guest session.
 Response: `200 OK`
 ```json
 {

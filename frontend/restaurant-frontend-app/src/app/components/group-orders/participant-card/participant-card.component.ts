@@ -16,7 +16,7 @@ export class ParticipantCardComponent {
   readonly isReadOnly = input(false);
   readonly editClick = output<void>();
   readonly canRemove = input(false);
-  readonly removeClick = output<void>();
+  readonly removeClick = output<Participant>();
   readonly removeDishClick = output<ParticipantItem>();
   readonly decreaseQuantity = output<ParticipantItem>();
   readonly increaseQuantity = output<ParticipantItem>();
