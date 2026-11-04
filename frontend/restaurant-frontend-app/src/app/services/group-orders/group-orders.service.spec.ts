@@ -62,4 +62,5 @@ describe('Рівень 2 · GroupOrdersService', () => {
     expect(req.request.body).toEqual({ reservationId: 'res-1' });
     req.flush([]);
   });
+
 });

@@ -76,7 +76,12 @@ public class GroupReservationService(
         return groupReservation ?? throw new InvalidOperationException($"Group reservation with ID {groupReservationId} not found.");
     }
 
-    public async Task<GroupReservation> CreateGroupReservationAsync(string reservationId)
+    public Task<GroupReservation> CreateGroupReservationAsync(string reservationId) =>
+        CreateGroupReservationAsync(reservationId, ownerUserId: null);
+
+    private async Task<GroupReservation> CreateGroupReservationAsync(
+        string reservationId,
+        string? ownerUserId)
     {
         var groupReservation = new GroupReservation
         {
@@ -87,6 +92,13 @@ public class GroupReservationService(
         };
 
         await groupReservationRepository.SaveGroupReservationAsync(groupReservation);
+        string? sessionOwnerId = ownerUserId;
+        if (sessionOwnerId is null)
+            sessionOwnerId = (await reservationRepository.GetReservationByIdAsync(reservationId))?.CustomerId;
+
+        if (!string.IsNullOrWhiteSpace(sessionOwnerId))
+            await EnsureOwnerSessionAsync(groupReservation.GroupReservationId, sessionOwnerId);
+
         return groupReservation;
     }
 
@@ -94,9 +106,54 @@ public class GroupReservationService(
     {
         GroupReservation? group = await groupReservationRepository.GetByReservationIdAsync(reservationId);
         if (group is not null)
+        {
+            await EnsureOwnerSessionAsync(group.GroupReservationId, userId);
             return;
+        }
 
-        await CreateGroupReservationAsync(reservationId);
+        await CreateGroupReservationAsync(reservationId, userId);
+    }
+
+    private async Task EnsureOwnerSessionAsync(string groupReservationId, string userId)
+    {
+        string ownerSessionId = GuestSession.CreateOwnerSession(groupReservationId, userId).Id;
+        GuestSession? existingOwnerSession =
+            await guestSessionRepository.GetByGuestSessionId(ownerSessionId);
+        if (existingOwnerSession is not null)
+        {
+            if (!existingOwnerSession.IsOwnerSession ||
+                (!string.IsNullOrWhiteSpace(existingOwnerSession.OwnerUserId) &&
+                 existingOwnerSession.OwnerUserId != userId))
+            {
+                throw new ActionForbiddenException("The owner session is already assigned to another user.");
+            }
+
+            if (string.IsNullOrWhiteSpace(existingOwnerSession.OwnerUserId))
+            {
+                existingOwnerSession.OwnerUserId = userId;
+                await guestSessionRepository.SaveAsync(existingOwnerSession);
+            }
+
+            return;
+        }
+
+        var sessions = await guestSessionRepository.GetAllByGroupReservationIdAsync(groupReservationId);
+        GuestSession? legacyOwnerSession = sessions.FirstOrDefault(session =>
+            session.IsOwnerSession &&
+            (string.IsNullOrWhiteSpace(session.OwnerUserId) || session.OwnerUserId == userId));
+        if (legacyOwnerSession is not null)
+        {
+            if (string.IsNullOrWhiteSpace(legacyOwnerSession.OwnerUserId))
+            {
+                legacyOwnerSession.OwnerUserId = userId;
+                await guestSessionRepository.SaveAsync(legacyOwnerSession);
+            }
+
+            return;
+        }
+
+        await guestSessionRepository.SaveAsync(
+            GuestSession.CreateOwnerSession(groupReservationId, userId));
     }
 
     public async Task UpdateGroupReservationStatusAsync(string groupReservationId, GroupReservationStatus status)

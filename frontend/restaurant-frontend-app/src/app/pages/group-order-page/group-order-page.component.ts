@@ -1,7 +1,7 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, map, switchMap, tap } from 'rxjs';
 import { ParticipantCardComponent } from '@app/components/group-orders/participant-card/participant-card.component';
 import { ModalComponent } from '@app/shared/custom-components/modal/modal.component';
@@ -10,6 +10,7 @@ import { GroupStatusResponse, GroupReservationStatus } from '@app/models/group-o
 import { Participant } from '@app/models/group-orders/participant.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
+import { ReservationService } from '@app/services/reservation/reservation.service';
 import { ToastService } from '@app/services/toast/toast.service';
 
 @Component({
@@ -21,7 +22,9 @@ import { ToastService } from '@app/services/toast/toast.service';
 })
 export class GroupOrderPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly groupOrdersService = inject(GroupOrdersService);
+  private readonly reservationService = inject(ReservationService);
   private readonly toast = inject(ToastService);
   private readonly reservationId = this.route.snapshot.paramMap.get('reservationId') ?? '';
 
@@ -35,7 +38,10 @@ export class GroupOrderPageComponent implements OnInit {
   readonly isConfirmOpen = signal(false);
   readonly consolidatedOrder = computed(() => consolidatePreOrder(this.participants()));
   readonly pendingParticipantsCount = computed(
-    () => this.participants().filter((participant) => !participant.isSubmitted).length,
+    () => this.participants().filter((participant) => participant.type === 'Guest' && !participant.isSubmitted).length,
+  );
+  readonly hasSubmittedGuest = computed(
+    () => this.participants().some((participant) => participant.type === 'Guest' && participant.isSubmitted),
   );
   readonly hasAnyDishes = computed(
     () => this.participants().some((participant) => participant.items.length > 0),
@@ -85,8 +91,34 @@ export class GroupOrderPageComponent implements OnInit {
       .subscribe();
   }
 
+  editOwnerPreOrder(): void {
+    this.reservationService.getReservationById(this.reservationId).subscribe({
+      next: (reservation) => {
+        const startTime = new Date(reservation.startTime);
+        const endTime = new Date(reservation.endTime);
+        const tableLabel = reservation.tableName || `Table ${reservation.tableId}`;
+
+        void this.router.navigate(['/menu'], {
+          queryParams: {
+            preOrder: 'true',
+            reservationId: reservation.id,
+            reservationLabel: [
+              reservation.locationAddress,
+              tableLabel,
+              startTime.toDateString(),
+              `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
+            ].join(', '),
+          },
+        });
+      },
+      error: (error: unknown) => {
+        console.error('Unable to load reservation details for editing the pre-order.', error);
+      },
+    });
+  }
+
   openSubmitConfirmation(): void {
-    if (!this.isSubmitting() && this.consolidatedOrder().items.length > 0) {
+    if (!this.isSubmitting() && this.hasSubmittedGuest() && this.consolidatedOrder().items.length > 0) {
       this.isConfirmOpen.set(true);
     }
   }
@@ -103,6 +135,7 @@ export class GroupOrderPageComponent implements OnInit {
       !invite ||
       this.isSubmitting() ||
       this.groupStatus() !== 'Open' ||
+      !this.hasSubmittedGuest() ||
       this.consolidatedOrder().items.length === 0
     ) {
       return;

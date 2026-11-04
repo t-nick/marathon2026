@@ -91,6 +91,38 @@ public class GroupReservationServiceTests
         Assert.Equal(expectedUserName, result.InviterName);
     }
 
+    [Fact]
+    public async Task CreateGroupReservationAsync_CustomerReservation_CreatesOwnerSession()
+    {
+        const string reservationId = "reservation-1";
+        const string ownerUserId = "owner-user";
+        var reservation = new Reservation
+        {
+            Id = reservationId,
+            TableId = "table-1",
+            CustomerId = ownerUserId,
+            WaiterId = "waiter-1"
+        };
+        GuestSession? savedSession = null;
+        _reservationRepositoryMock
+            .Setup(repository => repository.GetReservationByIdAsync(reservationId))
+            .ReturnsAsync(reservation);
+        _guestSessionRepositoryMock
+            .Setup(repository => repository.GetAllByGroupReservationIdAsync(It.IsAny<string>()))
+            .ReturnsAsync([]);
+        _guestSessionRepositoryMock
+            .Setup(repository => repository.SaveAsync(It.IsAny<GuestSession>()))
+            .Callback<GuestSession>(session => savedSession = session);
+
+        GroupReservation group = await _service.CreateGroupReservationAsync(reservationId);
+
+        Assert.NotNull(savedSession);
+        Assert.Equal(group.GroupReservationId, savedSession.GroupReservationId);
+        Assert.Equal(ownerUserId, savedSession.OwnerUserId);
+        Assert.True(savedSession.IsOwnerSession);
+        Assert.Empty(savedSession.Dishes);
+    }
+
     [Theory]
     [AutoData]
     public async Task GetGroupReservationByTokenAsync_InvalidToken_ThrowsNotFound(string token)

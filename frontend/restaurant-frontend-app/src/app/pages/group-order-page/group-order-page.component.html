@@ -65,6 +65,7 @@
                 [isOwner]="person.id === ownerSessionId()"
                 [canRemove]="groupStatus() === 'Open' && person.type === 'Guest'"
                 [isReadOnly]="groupStatus() !== 'Open'"
+                (editClick)="editOwnerPreOrder()"
             />
             </li>
         }
@@ -95,7 +96,7 @@
       <button
         class="submit-button"
         type="button"
-        [disabled]="consolidatedOrder().items.length === 0 || isSubmitting()"
+        [disabled]="!hasSubmittedGuest() || consolidatedOrder().items.length === 0 || isSubmitting()"
         (click)="openSubmitConfirmation()"
       >
         Submit Pre-Order

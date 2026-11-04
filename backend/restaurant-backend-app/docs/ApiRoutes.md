@@ -556,8 +556,9 @@ Response: `200 OK`
 
 ### `GET` /reservations/{reservationId}/guest-session-id
 Owner-only. Requires an authenticated Cognito `sub`; unauthenticated requests receive
-`401 Unauthorized`, and non-owners receive `403 Forbidden`. Missing reservation, group
-reservation, or owner guest session returns `404 Not Found`.
+`401 Unauthorized`, and non-owners receive `403 Forbidden`. If the owner session does
+not yet exist, the endpoint creates it and returns its ID. Missing reservation or group
+reservation returns `404 Not Found`.
 
 Response: `200 OK`
 ```json

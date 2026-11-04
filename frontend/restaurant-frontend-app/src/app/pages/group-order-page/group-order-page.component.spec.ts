@@ -2,12 +2,14 @@
 // Запуск: npm run test:hw
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
+import { ReservationService } from '@app/services/reservation/reservation.service';
 import { ToastService } from '@app/services/toast/toast.service';
 import { GroupSessionsResponse } from '@app/models/group-orders/group-sessions-response.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
+import { ReservationCustomer, ReservationStatusCustomer } from '@app/models/reservations/reservation.model';
 import { GroupOrderPageComponent } from './group-order-page.component';
 
 const caesar = { id: 'dish1', name: 'Caesar Salad', price: 180 };
@@ -35,12 +37,16 @@ function buttonByText(root: ParentNode, text: string): HTMLButtonElement | undef
 
 describe('Рівень 2 · сторінка Owner Review', () => {
   let service: jasmine.SpyObj<GroupOrdersService>;
+  let reservationService: jasmine.SpyObj<ReservationService>;
+  let router: jasmine.SpyObj<Router>;
 
   function create() {
     TestBed.configureTestingModule({
       imports: [GroupOrderPageComponent],
       providers: [
         { provide: GroupOrdersService, useValue: service },
+        { provide: ReservationService, useValue: reservationService },
+        { provide: Router, useValue: router },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error', 'info']) },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ reservationId: 'res-1' }) } } },
       ],
@@ -51,6 +57,21 @@ describe('Рівень 2 · сторінка Owner Review', () => {
   }
 
   beforeEach(() => {
+    reservationService = jasmine.createSpyObj<ReservationService>('ReservationService', ['getReservationById']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    reservationService.getReservationById.and.returnValue(
+      of({
+        id: 'res-1',
+        tableId: 'table-123',
+        startTime: new Date('2026-11-07T17:30:00'),
+        endTime: new Date('2026-11-07T19:00:00'),
+        guestCount: 5,
+        status: ReservationStatusCustomer.Reserved,
+        restaurantName: 'Green & Tasty',
+        locationAddress: '9 Abashidze Street',
+        waiterId: 'waiter-1',
+      } as ReservationCustomer),
+    );
     service = jasmine.createSpyObj<GroupOrdersService>('GroupOrdersService', [
       'getGroupInvite$', 'getSessions$', 'getOwnerSessionId$', 'getStatus$', 'submit$',
     ]);
@@ -77,6 +98,26 @@ describe('Рівень 2 · сторінка Owner Review', () => {
     it('бейдж статусу: «Collecting pre-orders»', () => {
       expect(create().element.textContent).toContain('Collecting pre-orders');
     });
+
+    it('кнопка редагування веде в меню з reservationId та форматованим reservationLabel', () => {
+      const { element } = create();
+      buttonByText(element, 'Edit my Pre-Order')?.click();
+
+      expect(reservationService.getReservationById).toHaveBeenCalledOnceWith('res-1');
+      expect(router.navigate).toHaveBeenCalledOnceWith(['/menu'], {
+        queryParams: {
+          preOrder: 'true',
+          reservationId: 'res-1',
+          reservationLabel: [
+            '9 Abashidze Street',
+            'Table table-123',
+            new Date('2026-11-07T17:30:00').toDateString(),
+            `${new Date('2026-11-07T17:30:00').toLocaleTimeString()} - ${new Date('2026-11-07T19:00:00').toLocaleTimeString()}`,
+          ].join(', '),
+        },
+      });
+    });
+
   });
 
   describe('консолідоване замовлення — головна пастка', () => {
