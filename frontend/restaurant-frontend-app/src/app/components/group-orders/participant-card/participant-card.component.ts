@@ -14,6 +14,7 @@ export class ParticipantCardComponent {
   readonly participant = input.required<Participant>();
   readonly isOwner = input(false);
   readonly isReadOnly = input(false);
+  readonly isDishBusy = input(false);
   readonly editClick = output<void>();
   readonly canRemove = input(false);
   readonly removeClick = output<Participant>();

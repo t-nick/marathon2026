@@ -113,13 +113,16 @@ describe('Практичне · картка учасника', () => {
     });
   });
 
-  it('показує перед кожним аватаром кнопку з іконкою кошика і передає страву при кліку', () => {
+  it('показує власнику перед кожним аватаром кнопку видалення і передає страву при кліку', () => {
     const participant: Participant = {
       ...OLENA,
+      id: 'owner',
+      type: 'Owner',
       items: [...OLENA.items, { dish: { id: 'dish3', name: 'Salad', price: 10 }, quantity: 1 }],
     };
     const fixture = TestBed.createComponent(ParticipantCardComponent);
     fixture.componentRef.setInput('participant', participant);
+    fixture.componentRef.setInput('isOwner', true);
     const removeDishClick = jasmine.createSpy('removeDishClick');
     fixture.componentInstance.removeDishClick.subscribe(removeDishClick);
     fixture.detectChanges();
@@ -142,6 +145,27 @@ describe('Практичне · картка учасника', () => {
     const button = rows[0].querySelector<HTMLButtonElement>('.remove-dish-button');
     button?.click();
     expect(removeDishClick).toHaveBeenCalledOnceWith(participant.items[0]);
+  });
+
+  it('не показує кнопку видалення страв у картках гостей', () => {
+    expect(render(OLENA).querySelector('.remove-dish-button')).toBeNull();
+  });
+
+  it('залишає кнопку видалення Owner видимою, але неактивною в режимі read-only', () => {
+    const fixture = TestBed.createComponent(ParticipantCardComponent);
+    fixture.componentRef.setInput('participant', {
+      ...OWNER,
+      items: [{ dish: { id: 'dish1', name: 'Caesar Salad', price: 180 }, quantity: 1 }],
+    });
+    fixture.componentRef.setInput('isOwner', true);
+    fixture.componentRef.setInput('isReadOnly', true);
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector(
+      'button[aria-label="Remove Caesar Salad"]'
+    ) as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    expect(button?.disabled).toBeTrue();
   });
 
   it('показує кнопки зміни кількості розміром 32px і емітить вибрану страву', () => {

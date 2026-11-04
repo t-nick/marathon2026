@@ -21,18 +21,15 @@
     <ul class="items">
       @for (item of participant().items; track item.dish.id) {
         <li class="item">
-          @if (!isReadOnly()) {
             <button
-              class="remove-dish-button"
-              type="button"
-              [attr.aria-label]="'Remove ' + item.dish.name"
-              (click)="removeDishClick.emit(item)"
+                class="remove-dish-button icon-button icon-button--small"
+                type="button"
+                [disabled]="isReadOnly() || isDishBusy()"
+                [attr.aria-label]="'Remove ' + item.dish.name"
+                (click)="removeDishClick.emit(item)"
             >
-              <img src="assets/svg/trash.svg" alt="" aria-hidden="true" />
+                <img src="assets/svg/trash.svg" alt="" aria-hidden="true" />
             </button>
-          } @else {
-            <span class="remove-dish-placeholder" aria-hidden="true"></span>
-          }
           @if (item.dish.imageUrl) {
             <img
               class="avatar"

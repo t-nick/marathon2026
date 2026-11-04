@@ -5,9 +5,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
+import { PreOrdersService } from '@app/services/pre-orders/pre-orders.service';
 import { ReservationService } from '@app/services/reservation/reservation.service';
 import { ToastService } from '@app/services/toast/toast.service';
 import { GroupSessionsResponse } from '@app/models/group-orders/group-sessions-response.model';
+import { Order } from '@app/models/orders/order.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 import {
   ReservationCustomer,
@@ -63,6 +65,7 @@ function buttonByText(root: ParentNode, text: string): HTMLButtonElement | undef
 
 describe('Рівень 2 · сторінка Owner Review', () => {
   let service: jasmine.SpyObj<GroupOrdersService>;
+  let preOrdersService: jasmine.SpyObj<PreOrdersService>;
   let reservationService: jasmine.SpyObj<ReservationService>;
   let router: jasmine.SpyObj<Router>;
 
@@ -71,6 +74,7 @@ describe('Рівень 2 · сторінка Owner Review', () => {
       imports: [GroupOrderPageComponent],
       providers: [
         { provide: GroupOrdersService, useValue: service },
+        { provide: PreOrdersService, useValue: preOrdersService },
         { provide: ReservationService, useValue: reservationService },
         { provide: Router, useValue: router },
         {
@@ -89,6 +93,41 @@ describe('Рівень 2 · сторінка Owner Review', () => {
   }
 
   beforeEach(() => {
+    preOrdersService = jasmine.createSpyObj<PreOrdersService>('PreOrdersService', [
+      'getByReservationId',
+      'editPreOrderByReservationId',
+    ]);
+    preOrdersService.getByReservationId.and.returnValue(
+      of({
+        orderId: 'order-1',
+        reservationAddress: '9 Abashidze Street',
+        reservationTime: '2026-11-07',
+        reservationId: 'res-1',
+        orderItems: [
+          {
+            dish: {
+              id: caesar.id,
+              name: caesar.name,
+              price: caesar.price,
+              imageUrl: '',
+              state: 'Available',
+              weight: '',
+              dishType: '',
+              description: '',
+              calories: '',
+              proteins: '',
+              carbohydrates: '',
+              fats: '',
+              vitamins: '',
+            },
+            quantity: 1,
+            state: 0,
+          },
+        ],
+        status: 0,
+      } as Order)
+    );
+    preOrdersService.editPreOrderByReservationId.and.returnValue(of({}));
     reservationService = jasmine.createSpyObj<ReservationService>('ReservationService', [
       'getReservationById',
     ]);
@@ -109,14 +148,12 @@ describe('Рівень 2 · сторінка Owner Review', () => {
     service = jasmine.createSpyObj<GroupOrdersService>('GroupOrdersService', [
       'getGroupInvite$',
       'getSessions$',
-      'getOwnerSessionId$',
       'getStatus$',
       'submit$',
       'removeSession$',
     ]);
     service.getGroupInvite$.and.returnValue(of(INVITE));
     service.getSessions$.and.returnValue(of(structuredClone(SESSIONS)));
-    service.getOwnerSessionId$.and.returnValue(of('owner'));
     service.getStatus$.and.returnValue(
       of({ currentParticipants: 3, maxCapacity: 5, status: 'Open' as const })
     );
@@ -174,6 +211,39 @@ describe('Рівень 2 · сторінка Owner Review', () => {
 
     it('жовта плашка: «1 participant hasn’t submitted…»', () => {
       expect(create().element.textContent).toMatch(/1 participant hasn.t submitted/);
+    });
+  });
+
+  describe('видалення страви з Owner pre-order', () => {
+    it('видаляє страву через API й оновлює Subtotal та Grand Total зі snapshot сервера', () => {
+      const updatedSnapshot: GroupSessionsResponse = {
+        participants: [
+          { ...SESSIONS.participants[0], items: [], total: 0 },
+          SESSIONS.participants[1],
+          SESSIONS.participants[2],
+        ],
+        total: 580,
+      };
+      service.getSessions$.and.returnValues(of(structuredClone(SESSIONS)), of(updatedSnapshot));
+
+      const { element, fixture } = create();
+      const removeButtons = element.querySelectorAll<HTMLButtonElement>(
+        'button[aria-label="Remove Caesar Salad"]'
+      );
+      expect(removeButtons.length).toBe(1);
+      removeButtons[0].click();
+      fixture.detectChanges();
+
+      expect(preOrdersService.getByReservationId).toHaveBeenCalledOnceWith('res-1');
+      expect(preOrdersService.editPreOrderByReservationId).toHaveBeenCalledOnceWith(
+        'res-1',
+        jasmine.objectContaining({ orderItems: [] })
+      );
+      expect(element.querySelectorAll('.subtotal-value')[0].textContent).toContain('$0.00');
+      expect(element.querySelector('.grand-total-value')?.textContent).toContain('$360.00');
+      expect(
+        element.querySelectorAll('app-participant-card')[0].querySelector('.item')
+      ).toBeNull();
     });
   });
 

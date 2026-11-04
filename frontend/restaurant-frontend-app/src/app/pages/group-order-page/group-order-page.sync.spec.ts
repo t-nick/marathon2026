@@ -2,6 +2,7 @@ import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
+import { PreOrdersService } from '@app/services/pre-orders/pre-orders.service';
 import { ReservationService } from '@app/services/reservation/reservation.service';
 import { ToastService } from '@app/services/toast/toast.service';
 import { GroupSessionsResponse } from '@app/models/group-orders/group-sessions-response.model';
@@ -51,6 +52,13 @@ describe('GroupOrderPageComponent background sync', () => {
       providers: [
         { provide: GroupOrdersService, useValue: service },
         {
+          provide: PreOrdersService,
+          useValue: jasmine.createSpyObj('PreOrdersService', [
+            'getByReservationId',
+            'editPreOrderByReservationId',
+          ]),
+        },
+        {
           provide: ReservationService,
           useValue: jasmine.createSpyObj('ReservationService', ['getReservationById']),
         },
@@ -76,14 +84,12 @@ describe('GroupOrderPageComponent background sync', () => {
     service = jasmine.createSpyObj<GroupOrdersService>('GroupOrdersService', [
       'getGroupInvite$',
       'getSessions$',
-      'getOwnerSessionId$',
       'getStatus$',
       'submit$',
       'removeSession$',
     ]);
     service.getGroupInvite$.and.returnValue(of(INVITE));
     service.getSessions$.and.returnValue(of(SESSIONS));
-    service.getOwnerSessionId$.and.returnValue(of('owner-1'));
     service.getStatus$.and.returnValue(of(STATUS_OPEN));
     service.submit$.and.returnValue(of([]));
     service.removeSession$.and.returnValue(of(SESSIONS));

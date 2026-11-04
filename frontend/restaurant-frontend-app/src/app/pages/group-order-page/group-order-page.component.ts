@@ -29,9 +29,11 @@ import {
   GroupStatusResponse,
   GroupReservationStatus,
 } from '@app/models/group-orders/group-status.model';
-import { Participant } from '@app/models/group-orders/participant.model';
+import { Participant, ParticipantItem } from '@app/models/group-orders/participant.model';
+import { Order } from '@app/models/orders/order.model';
 import { GuestInvite } from '@app/models/reservations/guest-invite.model';
 import { GroupOrdersService } from '@app/services/group-orders/group-orders.service';
+import { PreOrdersService } from '@app/services/pre-orders/pre-orders.service';
 import { ReservationService } from '@app/services/reservation/reservation.service';
 import { ToastService } from '@app/services/toast/toast.service';
 
@@ -46,13 +48,13 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly groupOrdersService = inject(GroupOrdersService);
+  private readonly preOrdersService = inject(PreOrdersService);
   private readonly reservationService = inject(ReservationService);
   private readonly toast = inject(ToastService);
   private readonly reservationId = this.route.snapshot.paramMap.get('reservationId') ?? '';
 
   readonly invite = signal<GuestInvite | null>(null);
   readonly participants = signal<Participant[]>([]);
-  readonly ownerSessionId = signal('');
   readonly groupStatus = signal<GroupReservationStatus>('Open');
   readonly loading = signal(true);
   readonly loadError = signal('');
@@ -60,6 +62,7 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   readonly isConfirmOpen = signal(false);
   readonly guestToRemove = signal<Participant | null>(null);
   readonly isRemovingGuest = signal(false);
+  readonly isRemovingDish = signal(false);
   readonly isRefreshing = signal(false);
   readonly updatedAt = signal<Date | null>(null);
   readonly refreshFailed = signal(false);
@@ -101,20 +104,17 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.loadError.set('');
 
-    forkJoin({
-      invite: this.groupOrdersService.getGroupInvite$(this.reservationId),
-      ownerSessionId: this.groupOrdersService.getOwnerSessionId$(this.reservationId),
-    })
+    this.groupOrdersService
+      .getGroupInvite$(this.reservationId)
       .pipe(
-        switchMap(({ invite, ownerSessionId }) =>
+        switchMap((invite) =>
           forkJoin({
             sessions: this.groupOrdersService.getSessions$(invite.GroupReservationId),
             status: this.groupOrdersService.getStatus$(invite.GroupReservationId),
-          }).pipe(map(({ sessions, status }) => ({ invite, ownerSessionId, sessions, status })))
+          }).pipe(map(({ sessions, status }) => ({ invite, sessions, status })))
         ),
-        tap(({ invite, ownerSessionId, sessions, status }) => {
+        tap(({ invite, sessions, status }) => {
           this.invite.set(invite);
-          this.ownerSessionId.set(ownerSessionId);
           this.participants.set(sessions.participants);
           this.groupStatus.set(status.status);
           this.updatedAt.set(new Date());
@@ -138,11 +138,67 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
 
   refreshNow(): void {
     const invite = this.invite();
-    if (!invite || this.groupStatus() !== 'Open' || this.isRefreshing() || this.isRemovingGuest()) {
+    if (
+      !invite ||
+      this.groupStatus() !== 'Open' ||
+      this.isRefreshing() ||
+      this.isRemovingGuest() ||
+      this.isRemovingDish()
+    ) {
       return;
     }
 
     this.refreshGroupData(invite.GroupReservationId).subscribe();
+  }
+
+  removeOwnerDish(item: ParticipantItem): void {
+    const invite = this.invite();
+    const owner = this.participants().find((participant) => participant.type === 'Owner');
+
+    if (
+      !invite ||
+      !owner ||
+      owner.type !== 'Owner' ||
+      !owner.items.some((ownerItem) => ownerItem.dish.id === item.dish.id) ||
+      this.groupStatus() !== 'Open' ||
+      this.isRemovingDish() ||
+      this.isRemovingGuest() ||
+      this.isRefreshing()
+    ) {
+      return;
+    }
+
+    this.isRemovingDish.set(true);
+    this.preOrdersService
+      .getByReservationId(this.reservationId)
+      .pipe(
+        switchMap((order) => {
+          if (!order.orderItems.some((orderItem) => orderItem.dish.id === item.dish.id)) {
+            throw new Error(`Dish ${item.dish.id} was not found in the owner's reservation order.`);
+          }
+
+          const updatedOrder: Order = {
+            ...order,
+            orderItems: order.orderItems.filter((orderItem) => orderItem.dish.id !== item.dish.id),
+          };
+
+          return this.preOrdersService
+            .editPreOrderByReservationId(this.reservationId, updatedOrder)
+            .pipe(switchMap(() => this.groupOrdersService.getSessions$(invite.GroupReservationId)));
+        }),
+        tap((sessions) => {
+          this.participants.set(sessions.participants);
+          this.updatedAt.set(new Date());
+          this.refreshFailed.set(false);
+          this.toast.success(`${item.dish.name} was removed from your pre-order.`);
+        }),
+        catchError((error: unknown) => {
+          console.error(`Unable to remove dish ${item.dish.id} from the owner's pre-order.`, error);
+          return EMPTY;
+        }),
+        finalize(() => this.isRemovingDish.set(false))
+      )
+      .subscribe();
   }
 
   requestRemoveGuest(participant: Participant): void {
@@ -150,7 +206,8 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
       participant.type === 'Guest' &&
       this.groupStatus() === 'Open' &&
       !this.isRemovingGuest() &&
-      !this.isRefreshing()
+      !this.isRefreshing() &&
+      !this.isRemovingDish()
     ) {
       this.guestToRemove.set(participant);
     }
@@ -171,7 +228,8 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
       participant.type !== 'Guest' ||
       this.groupStatus() !== 'Open' ||
       this.isRemovingGuest() ||
-      this.isRefreshing()
+      this.isRefreshing() ||
+      this.isRemovingDish()
     ) {
       return;
     }
@@ -206,7 +264,12 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   }
 
   private refreshGroupData(groupReservationId: string) {
-    if (this.isRefreshing() || this.isRemovingGuest() || this.groupStatus() !== 'Open') {
+    if (
+      this.isRefreshing() ||
+      this.isRemovingGuest() ||
+      this.isRemovingDish() ||
+      this.groupStatus() !== 'Open'
+    ) {
       return EMPTY;
     }
 
@@ -261,6 +324,7 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
   openSubmitConfirmation(): void {
     if (
       !this.isSubmitting() &&
+      !this.isRemovingDish() &&
       this.hasSubmittedGuest() &&
       this.consolidatedOrder().items.length > 0
     ) {
@@ -279,6 +343,7 @@ export class GroupOrderPageComponent implements OnInit, OnDestroy {
     if (
       !invite ||
       this.isSubmitting() ||
+      this.isRemovingDish() ||
       this.groupStatus() !== 'Open' ||
       !this.hasSubmittedGuest() ||
       this.consolidatedOrder().items.length === 0
